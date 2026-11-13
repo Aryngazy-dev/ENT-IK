@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-type Person = { slug: string; nameRu: string; nameKk: string | null; types: string[]; lifeStart: string | null; lifeEnd: string | null; summaryRu: string; category: { titleRu: string } | null };
 "use client";
 
 import { useEffect, useState } from "react";
