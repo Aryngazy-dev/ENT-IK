@@ -1,0 +1,9 @@
+"use client";
+import { useEffect, useState } from "react";
+type Result = { title: string; total: number; answered: number; correct: number; scorePercent: number; items: { ordinal: number; questionId: string; textRu: string; explanationRu: string; selectedOptionIds: string[]; isCorrect: boolean; options: { id: string; contentRu: string; isCorrect: boolean }[] }[] };
+export default function ResultsPage({ params }: { params: Promise<{ id: string }> }) {
+  const [result, setResult] = useState<Result | null>(null); const [error, setError] = useState("");
+  useEffect(() => { void params.then(({ id }) => fetch(`/api/sessions/${id}/results`).then(async (response) => response.ok ? setResult(await response.json()) : setError((await response.json()).error ?? "Не удалось получить результат"))); }, [params]);
+  if (error) return <main><h1>Результат недоступен</h1><p className="error">{error}</p></main>; if (!result) return <main><p className="eyebrow">РЕЗУЛЬТАТЫ</p><h1>Считаем результат…</h1></main>;
+  return <main><p className="eyebrow">РЕЗУЛЬТАТЫ · {result.title}</p><h1>{result.correct} из {result.total} — {result.scorePercent}%</h1><p className="lead">Отвечено: {result.answered}. Ниже — разбор каждого задания.</p><section className="review-list">{result.items.map((item) => <article key={item.questionId} className={item.isCorrect ? "correct" : "incorrect"}><p className="eyebrow">ВОПРОС {item.ordinal + 1} · {item.isCorrect ? "ВЕРНО" : "ОШИБКА"}</p><h2>{item.textRu}</h2><ul>{item.options.map((option) => <li key={option.id} className={option.isCorrect ? "right-answer" : item.selectedOptionIds.includes(option.id) ? "chosen-answer" : ""}>{option.contentRu}{option.isCorrect && " — правильный ответ"}{item.selectedOptionIds.includes(option.id) && !option.isCorrect && " — ваш выбор"}</li>)}</ul><p>{item.explanationRu}</p></article>)}</section></main>;
+}

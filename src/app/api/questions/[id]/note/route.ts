@@ -1,0 +1,7 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { isErrorResponse, requireUser } from "@/server/auth/authorization";
+import { db } from "@/server/db/client";
+type Context = { params: Promise<{ id: string }> }; const schema = z.object({ body: z.string().trim().max(3000) });
+export async function GET(_: Request, { params }: Context) { const access = await requireUser(); if (isErrorResponse(access)) return access; const note = await db.note.findUnique({ where: { userId_questionId: { userId: access.userId, questionId: (await params).id } } }); return NextResponse.json({ body: note?.body ?? "" }); }
+export async function PUT(request: Request, { params }: Context) { const access = await requireUser(); if (isErrorResponse(access)) return access; const parsed = schema.safeParse(await request.json().catch(() => null)); if (!parsed.success) return NextResponse.json({ error: "Заметка не должна превышать 3000 символов" }, { status: 400 }); const questionId = (await params).id; if (!parsed.data.body) { try { await db.note.delete({ where: { userId_questionId: { userId: access.userId, questionId } } }); } catch { /* empty note is already removed */ } return NextResponse.json({ body: "" }); } const note = await db.note.upsert({ where: { userId_questionId: { userId: access.userId, questionId } }, create: { userId: access.userId, questionId, body: parsed.data.body }, update: { body: parsed.data.body } }); return NextResponse.json({ body: note.body }); }

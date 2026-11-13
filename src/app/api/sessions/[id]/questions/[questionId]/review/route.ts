@@ -1,0 +1,6 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { isErrorResponse, requireUser } from "@/server/auth/authorization";
+import { db } from "@/server/db/client";
+type Context = { params: Promise<{ id: string; questionId: string }> }; const schema = z.object({ markedForReview: z.boolean() });
+export async function PUT(request: Request, { params }: Context) { const access = await requireUser(); if (isErrorResponse(access)) return access; const parsed = schema.safeParse(await request.json().catch(() => null)); if (!parsed.success) return NextResponse.json({ error: "Некорректная пометка" }, { status: 400 }); const { id: sessionId, questionId } = await params; const session = await db.testSession.findFirst({ where: { id: sessionId, userId: access.userId, status: "ACTIVE" } }); if (!session) return NextResponse.json({ error: "Активная сессия не найдена" }, { status: 404 }); const row = await db.sessionQuestion.updateMany({ where: { sessionId, questionId }, data: { markedForReview: parsed.data.markedForReview } }); return row.count ? NextResponse.json({ markedForReview: parsed.data.markedForReview }) : NextResponse.json({ error: "Вопрос не принадлежит сессии" }, { status: 404 }); }

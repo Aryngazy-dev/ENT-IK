@@ -1,0 +1,3 @@
+import { NextResponse } from "next/server";
+import { db } from "@/server/db/client";
+export async function GET(request: Request) { const { searchParams } = new URL(request.url); const query = searchParams.get("q")?.trim(); const categoryId = searchParams.get("categoryId"); return NextResponse.json(await db.person.findMany({ where: { status: "APPROVED", ...(categoryId ? { categoryId } : {}), ...(query ? { OR: [{ nameRu: { contains: query, mode: "insensitive" } }, { aliases: { has: query } }] } : {}) }, orderBy: { nameRu: "asc" }, select: { slug: true, nameRu: true, nameKk: true, types: true, lifeStart: true, lifeEnd: true, summaryRu: true, category: { select: { titleRu: true } } } })); }

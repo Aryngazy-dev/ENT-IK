@@ -1,0 +1,6 @@
+import { NextResponse } from "next/server";
+import { db } from "@/server/db/client";
+import { isErrorResponse, requireAdmin } from "@/server/auth/authorization";
+import { mapAssetSchema } from "@/shared/validation/maps";
+export async function GET() { const access = await requireAdmin(); if (isErrorResponse(access)) return access; return NextResponse.json(await db.mapAsset.findMany({ include: { mediaAsset: true, markers: true, regions: true }, orderBy: { mediaAsset: { createdAt: "desc" } } })); }
+export async function POST(request: Request) { const access = await requireAdmin(); if (isErrorResponse(access)) return access; const parsed = mapAssetSchema.safeParse(await request.json()); if (!parsed.success) return NextResponse.json({ error: "Некорректные данные карты" }, { status: 400 }); const media = await db.mediaAsset.findFirst({ where: { id: parsed.data.mediaAssetId, type: "MAP" } }); if (!media) return NextResponse.json({ error: "Выберите медиа типа MAP" }, { status: 409 }); try { return NextResponse.json(await db.mapAsset.create({ data: parsed.data, include: { mediaAsset: true } }), { status: 201 }); } catch { return NextResponse.json({ error: "Карта уже размечена" }, { status: 409 }); } }

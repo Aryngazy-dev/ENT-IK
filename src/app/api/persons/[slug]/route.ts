@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { db } from "@/server/db/client";
+type Context = { params: Promise<{ slug: string }> };
+export async function GET(_: Request, { params }: Context) { const person = await db.person.findFirst({ where: { slug: (await params).slug, status: "APPROVED" }, include: { category: { select: { titleRu: true } }, portrait: { select: { storageKey: true, altRu: true, captionRu: true } }, topics: { include: { topic: { select: { id: true, titleRu: true } } } }, questions: { select: { questionId: true } } } }); if (!person) return NextResponse.json({ error: "Личность не найдена" }, { status: 404 }); return NextResponse.json({ ...person, portrait: person.portrait ? { url: `/uploads/${person.portrait.storageKey}`, altRu: person.portrait.altRu, captionRu: person.portrait.captionRu } : null }); }
