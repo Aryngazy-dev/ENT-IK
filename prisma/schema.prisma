@@ -1,0 +1,587 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum Language {
+  RU
+  KK
+}
+
+enum ContentStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum QuestionOrigin {
+  MANUAL
+  AI
+  IMPORTED
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  CONTEXT
+  CHRONOLOGY
+  MATCHING
+  ODD_ONE_OUT
+  TRUE_FALSE
+  CAUSE_EFFECT
+  MAP_CLICK
+  DEFINITION
+}
+
+enum TestMode {
+  TRAINING
+  MOCK_EXAM
+  MISTAKES
+  SMART_REVIEW
+  MARATHON
+  CHRONOLOGY
+  PERSONS
+  MAPS
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+  EXPIRED
+}
+
+enum MediaType {
+  MAP
+  PHOTO
+  ARTIFACT
+  DOCUMENT
+  PORTRAIT
+  SCHEME
+}
+
+enum ImageRole {
+  PROMPT
+  OPTION
+  EXPLANATION
+}
+
+enum MapInteractionType {
+  NONE
+  SELECT_MARKER
+  CLICK_REGION
+  CLICK_MARKER
+  LABEL_MARKERS
+}
+
+enum MasteryLevel {
+  NOT_STARTED
+  LEARNING
+  CONSOLIDATED
+}
+
+enum ProgressEventType {
+  ANSWERED
+  BOOKMARKED
+  NOTE_UPDATED
+  MARKED_LEARNED
+  PERSON_LEARNED
+  RESET
+}
+
+enum ImportStatus {
+  UPLOADED
+  MAPPED
+  VALIDATED
+  IMPORTING
+  COMPLETED
+  FAILED
+}
+
+enum GenerationStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  role           UserRole        @default(STUDENT)
+  language       Language        @default(RU)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  sessions       TestSession[]
+  attempts       Attempt[]
+  progress       UserProgress[]
+  progressEvents ProgressEvent[]
+  bookmarks      Bookmark[]
+  notes          Note[]
+  dailyActivity  DailyActivity[]
+  oauthAccounts  OAuthAccount[]
+}
+
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  email             String?
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Category {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  titleRu       String
+  titleKk       String
+  descriptionRu String?
+  descriptionKk String?
+  icon          String?
+  sortOrder     Int      @default(0)
+  topics        Topic[]
+  persons       Person[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Topic {
+  id            String           @id @default(cuid())
+  categoryId    String
+  category      Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  slug          String           @unique
+  titleRu       String
+  titleKk       String
+  descriptionRu String?
+  descriptionKk String?
+  sortOrder     Int              @default(0)
+  subtopics     Subtopic[]
+  materials     SourceMaterial[]
+  questions     Question[]
+  persons       PersonTopic[]
+  places        PlaceTopic[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([categoryId, sortOrder])
+}
+
+model Subtopic {
+  id        String     @id @default(cuid())
+  topicId   String
+  topic     Topic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  slug      String     @unique
+  titleRu   String
+  titleKk   String
+  sortOrder Int        @default(0)
+  questions Question[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([topicId, sortOrder])
+}
+
+model SourceMaterial {
+  id         String        @id @default(cuid())
+  topicId    String?
+  topic      Topic?        @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  title      String
+  rawText    String
+  sourceUrl  String?
+  storageKey String?
+  mimeType   String?
+  status     ContentStatus @default(DRAFT)
+  questions  Question[]
+  generationJobs GenerationJob[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model QuestionGroup {
+  id        String     @id @default(cuid())
+  factKey   String
+  questions Question[]
+  createdAt DateTime   @default(now())
+}
+
+model Question {
+  id               String                 @id @default(cuid())
+  topicId          String
+  subtopicId       String?
+  sourceMaterialId String?
+  groupId          String?
+  mediaAssetId     String?
+  type             QuestionType
+  difficulty       Difficulty
+  status           ContentStatus          @default(DRAFT)
+  origin           QuestionOrigin         @default(MANUAL)
+  textRu           String
+  textKk           String?
+  contextRu        String?
+  contextKk        String?
+  explanationRu    String
+  explanationKk    String?
+  payload          Json
+  tags             String[]               @default([])
+  embedding        Unsupported("vector")?
+  imageRole        ImageRole?
+  interactionType  MapInteractionType     @default(NONE)
+  topic            Topic                  @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  subtopic         Subtopic?              @relation(fields: [subtopicId], references: [id], onDelete: SetNull)
+  sourceMaterial   SourceMaterial?        @relation(fields: [sourceMaterialId], references: [id], onDelete: SetNull)
+  group            QuestionGroup?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  mediaAsset       MediaAsset?            @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  variants         QuestionVariant[]
+  options          QuestionOption[]
+  sessionQuestions SessionQuestion[]
+  attempts         Attempt[]
+  persons          QuestionPerson[]
+  places           QuestionPlace[]
+  bookmarks        Bookmark[]
+  notes            Note[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([topicId, status, difficulty])
+  @@index([groupId])
+}
+
+model QuestionVariant {
+  id          String   @id @default(cuid())
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  language    Language
+  text        String
+  contextText String?
+  createdAt   DateTime @default(now())
+  sessionQuestions SessionQuestion[]
+
+  @@unique([questionId, language, text])
+}
+
+model QuestionOption {
+  id           String      @id @default(cuid())
+  questionId   String
+  question     Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  contentRu    String
+  contentKk    String?
+  mediaAssetId String?
+  isCorrect    Boolean
+  sortOrder    Int         @default(0)
+  mediaAsset   MediaAsset? @relation("OptionMedia", fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  @@index([questionId, sortOrder])
+}
+
+model MediaAsset {
+  id              String           @id @default(cuid())
+  storageKey      String           @unique
+  type            MediaType
+  altRu           String
+  altKk           String?
+  captionRu       String?
+  captionKk       String?
+  author          String?
+  sourceUrl       String?
+  license         String?
+  width           Int
+  height          Int
+  status          ContentStatus    @default(DRAFT)
+  map             MapAsset?
+  promptQuestions Question[]
+  optionQuestions QuestionOption[] @relation("OptionMedia")
+  portraits       Person[]         @relation("PersonPortrait")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model MapAsset {
+  id            String      @id @default(cuid())
+  mediaAssetId  String      @unique
+  mediaAsset    MediaAsset  @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  periodRu      String?
+  periodKk      String?
+  descriptionRu String
+  descriptionKk String?
+  regions       MapRegion[]
+  markers       MapMarker[]
+}
+
+model MapRegion {
+  id         String   @id @default(cuid())
+  mapAssetId String
+  mapAsset   MapAsset @relation(fields: [mapAssetId], references: [id], onDelete: Cascade)
+  labelRu    String
+  labelKk    String?
+  geometry   Json
+  color      String
+  periodRu   String?
+  periodKk   String?
+}
+
+model MapMarker {
+  id             String   @id @default(cuid())
+  mapAssetId     String
+  mapAsset       MapAsset @relation(fields: [mapAssetId], references: [id], onDelete: Cascade)
+  label          String
+  x              Decimal  @db.Decimal(5, 2)
+  y              Decimal  @db.Decimal(5, 2)
+  correctLabelRu String
+  correctLabelKk String?
+  placeId        String?
+  personId       String?
+  place          Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  person         Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+}
+
+model Person {
+  id              String           @id @default(cuid())
+  categoryId      String?
+  slug            String           @unique
+  nameRu          String
+  nameKk          String?
+  aliases         String[]         @default([])
+  types           String[]         @default([])
+  lifeStart       String?
+  lifeEnd         String?
+  regionRu        String?
+  regionKk        String?
+  summaryRu       String
+  summaryKk       String?
+  biographyRu     String?
+  biographyKk     String?
+  events          Json             @default("[]")
+  sources         Json             @default("[]")
+  portraitMediaId String?
+  status          ContentStatus    @default(DRAFT)
+  category        Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  portrait        MediaAsset?      @relation("PersonPortrait", fields: [portraitMediaId], references: [id], onDelete: SetNull)
+  topics          PersonTopic[]
+  questions       QuestionPerson[]
+  markers         MapMarker[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Place {
+  id        String          @id @default(cuid())
+  slug      String          @unique
+  nameRu    String
+  nameKk    String?
+  aliases   String[]        @default([])
+  latitude  Decimal?        @db.Decimal(9, 6)
+  longitude Decimal?        @db.Decimal(9, 6)
+  periodRu  String?
+  periodKk  String?
+  topics    PlaceTopic[]
+  questions QuestionPlace[]
+  markers   MapMarker[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model PersonTopic {
+  personId String
+  topicId  String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([personId, topicId])
+}
+
+model PlaceTopic {
+  placeId String
+  topicId String
+  place   Place  @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([placeId, topicId])
+}
+
+model QuestionPerson {
+  questionId String
+  personId   String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, personId])
+}
+
+model QuestionPlace {
+  questionId String
+  placeId    String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  place      Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, placeId])
+}
+
+model TestSession {
+  id          String            @id @default(cuid())
+  userId      String?
+  guestId     String?
+  mode        TestMode
+  title       String
+  status      SessionStatus     @default(ACTIVE)
+  startedAt   DateTime          @default(now())
+  expiresAt   DateTime?
+  completedAt DateTime?
+  user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions   SessionQuestion[]
+  attempts    Attempt[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId, status])
+  @@index([guestId, status])
+}
+
+model SessionQuestion {
+  id              String      @id @default(cuid())
+  sessionId       String
+  questionId      String
+  variantId       String?
+  ordinal         Int
+  markedForReview Boolean     @default(false)
+  session         TestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question        Question    @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  variant         QuestionVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, ordinal])
+}
+
+model Attempt {
+  id             String      @id @default(cuid())
+  clientEventId  String      @unique
+  sessionId      String
+  questionId     String
+  userId         String?
+  answer         Json
+  isCorrect      Boolean?
+  elapsedSeconds Int         @default(0)
+  answeredAt     DateTime    @default(now())
+  session        TestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question       Question    @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, questionId])
+}
+
+model UserProgress {
+  id             String       @id @default(cuid())
+  userId         String
+  topicId        String?
+  personId       String?
+  placeId        String?
+  answeredCount  Int          @default(0)
+  correctCount   Int          @default(0)
+  mastery        MasteryLevel @default(NOT_STARTED)
+  lastReviewedAt DateTime?
+  nextReviewAt   DateTime?
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@unique([userId, personId])
+  @@unique([userId, placeId])
+  @@index([userId, nextReviewAt])
+}
+
+model ProgressEvent {
+  id            String            @id @default(cuid())
+  clientEventId String            @unique
+  userId        String?
+  guestId       String?
+  type          ProgressEventType
+  payload       Json
+  occurredAt    DateTime
+  receivedAt    DateTime          @default(now())
+  user          User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, occurredAt])
+  @@index([guestId, occurredAt])
+}
+
+model Bookmark {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, questionId])
+}
+
+model Note {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  body       String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, questionId])
+}
+
+model DailyActivity {
+  id      String   @id @default(cuid())
+  userId  String
+  day     DateTime @db.Date
+  answers Int      @default(0)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+}
+
+model ImportJob {
+  id          String       @id @default(cuid())
+  createdById String
+  status      ImportStatus @default(UPLOADED)
+  sourceKey   String
+  mapping     Json?
+  preview     Json?
+  error       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model GenerationJob {
+  id String @id @default(cuid())
+  sourceMaterialId String
+  requestedById String
+  maximumQuestions Int
+  status GenerationStatus @default(QUEUED)
+  attempts Int @default(0)
+  result Json?
+  error String?
+  lockedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sourceMaterial SourceMaterial @relation(fields: [sourceMaterialId], references: [id], onDelete: Cascade)
+  @@index([status, createdAt])
+}

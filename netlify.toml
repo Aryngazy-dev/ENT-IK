@@ -1,0 +1,9 @@
+[build]
+  command = "npm run db:deploy && npm run db:generate && npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--include=dev"
+
+# Netlify automatically applies its current OpenNext adapter for Next.js.
+# Do not set `publish`: the adapter supplies the correct output directory.

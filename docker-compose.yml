@@ -1,0 +1,58 @@
+services:
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ent_history?schema=public
+      REDIS_URL: redis://redis:6379
+      AUTH_SECRET: ${AUTH_SECRET:-replace-this-development-secret-with-32-chars}
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_PATH: /app/public/uploads
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      DATABASE_BOOTSTRAP_MODE: ${DATABASE_BOOTSTRAP_MODE:-migrate}
+    ports: ["3000:3000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes: ["uploads_data:/app/public/uploads"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  generation-worker:
+    build: .
+    command: npm run worker:generation
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ent_history?schema=public
+      REDIS_URL: redis://redis:6379
+      AUTH_SECRET: ${AUTH_SECRET:-replace-this-development-secret-with-32-chars}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ent_history
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ent_history"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: redis-server --appendonly yes
+    volumes: ["redis_data:/data"]
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

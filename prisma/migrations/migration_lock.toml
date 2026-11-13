@@ -1,0 +1,2 @@
+# Do not edit manually. Keeps Prisma migration provider deterministic.
+provider = "postgresql"
