@@ -3,17 +3,20 @@ import { useEffect, useState } from "react";
 type Person = { slug: string; nameRu: string; nameKk: string | null; types: string[]; lifeStart: string | null; lifeEnd: string | null; summaryRu: string; category: { titleRu: string } | null };
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
-interface Person {
+type Person = {
   slug: string;
   nameRu: string;
-  category?: { titleRu: string };
-  lifeStart?: string | number;
-  lifeEnd?: string | number;
-  summaryRu?: string;
+  nameKk: string | null;
   types: string[];
-}
+  lifeStart: string | null;
+  lifeEnd: string | null;
+  summaryRu: string | null;
+  category: {
+    titleRu: string;
+  } | null;
+};
 
 export default function PersonsPage() {
   const [people, setPeople] = useState<Person[]>([]);
@@ -22,11 +25,17 @@ export default function PersonsPage() {
 
   async function search(value = query) {
     setLoading(true);
-    const response = await fetch(`/api/persons?q=${encodeURIComponent(value)}`);
-    if (response.ok) {
-      setPeople(await response.json());
+    try {
+      const response = await fetch(`/api/persons?q=${encodeURIComponent(value)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPeople(data);
+      }
+    } catch (error) {
+      console.error("Failed to load persons", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -64,7 +73,7 @@ export default function PersonsPage() {
                 {person.lifeEnd ? ` — ${person.lifeEnd}` : ""}
               </p>
               <p>{person.summaryRu}</p>
-              <small>{person.types?.join(" · ") || ""}</small>
+              <small>{person.types?.join(" · ") ?? ""}</small>
             </a>
           ))}
         </section>
