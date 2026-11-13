@@ -1,0 +1,3 @@
+"use client";
+type Item = { id: string; contentRu: string };
+export function ChronologyEditor({ items, onChange }: { items: Item[]; onChange: (items: Item[]) => void }) { function move(index: number, offset: number) { const next = [...items]; const target = index + offset; if (target < 0 || target >= next.length) return; [next[index], next[target]] = [next[target], next[index]]; onChange(next); } return <ol className="chronology-editor">{items.map((item, index) => <li key={item.id}><span>{item.contentRu}</span><button onClick={() => move(index, -1)} disabled={!index} aria-label="Переместить выше">↑</button><button onClick={() => move(index, 1)} disabled={index === items.length - 1} aria-label="Переместить ниже">↓</button></li>)}</ol>; }

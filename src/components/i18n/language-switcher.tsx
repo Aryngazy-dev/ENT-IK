@@ -1,0 +1,3 @@
+"use client";
+import { useState } from "react";
+export function LanguageSwitcher({ initial = "ru" }: { initial?: "ru" | "kk" }) { const [language, setLanguage] = useState(initial); async function change(next: "ru" | "kk") { setLanguage(next); await fetch("/api/preferences/language", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ language: next.toUpperCase() }) }); window.location.reload(); } return <div className="language-switcher" aria-label="Язык интерфейса"><button className={language === "ru" ? "selected" : ""} onClick={() => change("ru")}>RU</button><button className={language === "kk" ? "selected" : ""} onClick={() => change("kk")}>ҚАЗ</button></div>; }

@@ -1,0 +1,3 @@
+"use client";
+type Item = { id: string; contentRu: string }; type Match = { leftId: string; rightId: string };
+export function MatchingEditor({ left, right, matches, onChange }: { left: Item[]; right: Item[]; matches: Match[]; onChange: (matches: Match[]) => void }) { return <div className="matching-editor">{left.map((item) => <label key={item.id}><span>{item.contentRu}</span><select value={matches.find((match) => match.leftId === item.id)?.rightId ?? ""} onChange={(event) => onChange([...matches.filter((match) => match.leftId !== item.id), { leftId: item.id, rightId: event.target.value }])}><option value="">Выберите соответствие</option>{right.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.contentRu}</option>)}</select></label>)}</div>; }

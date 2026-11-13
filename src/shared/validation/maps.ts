@@ -1,0 +1,4 @@
+import { z } from "zod";
+export const mapAssetSchema = z.object({ mediaAssetId: z.string().cuid(), descriptionRu: z.string().trim().min(10).max(3000), descriptionKk: z.string().trim().max(3000).optional(), periodRu: z.string().trim().max(200).optional(), periodKk: z.string().trim().max(200).optional() });
+export const mapMarkerSchema = z.object({ label: z.string().trim().min(1).max(16), x: z.number().min(0).max(100), y: z.number().min(0).max(100), correctLabelRu: z.string().trim().min(1).max(200), correctLabelKk: z.string().trim().max(200).optional() });
+export const mapRegionSchema = z.object({ labelRu: z.string().trim().min(1).max(200), labelKk: z.string().trim().max(200).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/), geometry: z.object({ coordinates: z.array(z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)])).min(3).max(200) }) });
